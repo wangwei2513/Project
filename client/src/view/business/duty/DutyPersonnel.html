@@ -1,0 +1,265 @@
+<div id="duty-personnel">
+  <div class="team-list">
+    <div class="title">
+      班组列表
+    </div>
+    <div class="toolbar">
+      <ButtonGroup size="small">
+        <Button icon="plus"
+          :disabled="!selectedTeam"
+          @click="addTeam"></Button>
+        <Button icon="trash-a"
+          :disabled="!selectedTeam || selectedTeam.isroot"
+          @click="removeTeam"></Button>
+        <Button icon="edit"
+          :disabled="!selectedTeam"
+          @click="editTeam"></Button>
+        <Button icon="refresh"
+          @click="refreshTeam"></Button>
+      </ButtonGroup>
+    </div>
+    <div class="team-tree">
+      <Tree :data="treeData"
+        empty-text="没有数据的提示"
+        @on-select-change="teamSelectChange"></Tree>
+    </div>
+  </div>
+  <div ref="mainContent"
+    class="main-content">
+    <div class="toolbar">
+      <div class="left-bar">
+        <Button icon="plus"
+          :disabled="$lodash.isEmpty(selectedTeam)"
+          @click="addPerson">添加</Button>
+        <Button icon="edit"
+          :disabled="!selectedPerson || selectedPerson.length > 1"
+          @click="modifyPerson">修改</Button>
+        <Button icon="trash-a"
+          :disabled="!selectedPerson"
+          @click="removePerson">删除</Button>
+        <Button icon="arrow-move"
+          :disabled="!selectedPerson"
+          @click="movePerson">移动</Button>
+        <!-- TODO 刷新的时候加 loding -->
+        <Button icon="refresh"
+          @click="refreshList">刷新</Button>
+      </div>
+      <div class="right-bar">
+        <Input v-model="searchData"
+          placeholder="请输入姓名或员工号"
+          @on-click="confirmSearch"
+          @on-enter="confirmSearch"
+          icon="search">
+        </Input>
+      </div>
+    </div>
+    <div class="table-container"
+      ref="tableContainer">
+      <Table v-if="tableWidth && tableHeight"
+        :columns="columns"
+        :height='tableHeight'
+        :width='tableWidth'
+        :data="data"
+        @on-selection-change="handleTableSelectionChange"></Table>
+    </div>
+    <div class="paging-container">
+      <Page :total="page.total"
+        :page-size="page.pageSize"
+        :current="page.current"
+        :page-size-opts="$PageInfo.size"
+        @on-page-size-change="handlePageSizeChange"
+        @on-change="handlePageChange"
+        show-total
+        show-sizer
+        show-elevator></Page>
+    </div>
+  </div>
+  <!-- 各种 model  -->
+  <!-- 添加班组 -->
+  <Modal v-model="modalVisibleAddTeamList"
+    title="添加班组"
+    :mask-closable="false"
+    @on-cancel="closeAddTeamList">
+    <Form ref="newTeamList"
+      label-position="left"
+      :label-width="70"
+      :model="newTeamList"
+      :rules="newTeamListRules">
+      <FormItem label="所属班组">
+        {{ addTeamList.parent }}
+      </FormItem>
+      <FormItem label="班组编号"
+        prop="number">
+        <Input v-model="newTeamList.number"
+          placeholder="请输入班组编号"></Input>
+      </FormItem>
+      <FormItem label="班组名称"
+        prop="name">
+        <Input v-model="newTeamList.name"
+          placeholder="请输入班组名称"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button @click="closeAddTeamList">取消</Button>
+      <Button type="primary"
+        :disabled="disableRuleTeamList(newTeamList)"
+        @click="addTeamList">创建</Button>
+    </div>
+  </Modal>
+  <!-- 编辑班组 -->
+  <Modal v-model="modalVisibleEditeTeamList"
+    title="编辑班组"
+    :mask-closable="false"
+    @on-cancel="closeEditTeamList">
+    <Form ref="editeTeamList"
+      label-position="left"
+      :label-width="70"
+      :model="editedTeamList"
+      :rules="newTeamListRules">
+      <FormItem label="所属班组">
+        {{ editedTeamList.parent }}
+      </FormItem>
+      <!-- TODO 错误提示需要样式标准 -->
+      <FormItem label="班组编号"
+        prop="number">
+        <Input v-model="editedTeamList.number"
+          placeholder="请输入班组编号"></Input>
+      </FormItem>
+      <FormItem label="班组名称"
+        prop="name">
+        <Input v-model="editedTeamList.name"
+          placeholder="请输入班组名称"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button @click="closeEditTeamList">取消</Button>
+      <Button type="primary"
+        :disabled="disableRuleTeamList(editedTeamList)"
+        @click="editeTeamList">修改</Button>
+    </div>
+  </Modal>
+  <Modal v-model="modalVisableAddPerson"
+    title="添加班组人员"
+    :mask-closable="false"
+    @on-cancel="closeAddPersonModal">
+    <Form ref="addPerson"
+      label-position="left"
+      :label-width="70"
+      :model="newPerson"
+      :rules="newPersonRules">
+      <FormItem label="所属班组">
+        {{ selectedTeam ? selectedTeam.title : '-'}}
+      </FormItem>
+      <FormItem label="员工号"
+        prop="number">
+        <Input v-model="newPerson.number"
+          placeholder="请输入员工号"></Input>
+      </FormItem>
+      <FormItem label="姓名"
+        prop="name">
+        <Input v-model="newPerson.name"
+          placeholder="请输入员工名称"></Input>
+      </FormItem>
+      <FormItem label="性别"
+        prop="sex">
+        <RadioGroup v-model="newPerson.sex">
+          <Radio label="man">
+            男
+          </Radio>
+          <Radio label="woman">
+            女
+          </Radio>
+        </RadioGroup>
+      </FormItem>
+      <FormItem label="联系方式"
+        prop="contact">
+        <Input v-model="newPerson.contact"
+          placeholder="请输入员工联系方式"></Input>
+      </FormItem>
+      <FormItem label="部门"
+        prop="department">
+        <Input v-model="newPerson.department"
+          placeholder="请输入员工部门"></Input>
+      </FormItem>
+      <FormItem label="职务"
+        prop="position">
+        <Input v-model="newPerson.position"
+          placeholder="请输入员工职务"></Input>
+      </FormItem>
+      <FormItem label="通讯地址"
+        prop="address">
+        <Input type="textarea"
+          v-model="newPerson.address"
+          placeholder="请输入员工通讯地址"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button @click="closeAddPersonModal">取消</Button>
+      <Button type="primary"
+        :disabled="disableRulePerson(newPerson)"
+        @click="confirmAddPerson">添加</Button>
+    </div>
+  </Modal>
+  <Modal v-model="modalVisableEditePerson"
+    title="修改班组人员"
+    :mask-closable="false"
+    @on-cancel="closeEditePersonModal">
+    <Form ref="editePerson"
+      label-position="right"
+      :label-width="70"
+      :model="editedPerson"
+      :rules="newPersonRules">
+      <FormItem label="所属班组">
+        {{ editedPerson.teamName }}
+      </FormItem>
+      <FormItem label="员工号"
+        prop="number">
+        <Input v-model="editedPerson.number"
+          placeholder="请输入员工号"></Input>
+      </FormItem>
+      <FormItem label="姓名"
+        prop="name">
+        <Input v-model="editedPerson.name"
+          placeholder="请输入员工名称"></Input>
+      </FormItem>
+      <FormItem label="性别"
+        prop="sex">
+        <RadioGroup v-model="editedPerson.sex">
+          <Radio label="man">
+            男
+          </Radio>
+          <Radio label="woman">
+            女
+          </Radio>
+        </RadioGroup>
+      </FormItem>
+      <FormItem label="联系方式"
+        prop="contact">
+        <Input v-model="editedPerson.contact"
+          placeholder="请输入员工联系方式"></Input>
+      </FormItem>
+      <FormItem label="部门"
+        prop="department">
+        <Input v-model="editedPerson.department"
+          placeholder="请输入员工部门"></Input>
+      </FormItem>
+      <FormItem label="职务"
+        prop="position">
+        <Input v-model="editedPerson.position"
+          placeholder="请输入员工职务"></Input>
+      </FormItem>
+      <FormItem label="通讯地址"
+        prop="address">
+        <Input type="textarea"
+          v-model="editedPerson.address"
+          placeholder="请输入员工通讯地址"></Input>
+      </FormItem>
+    </Form>
+    <div slot="footer">
+      <Button @click="closeEditePersonModal">取消</Button>
+      <Button type="primary"
+        :disabled="disableRulePerson(editedPerson)"
+        @click="confirmEditePerson">修改</Button>
+    </div>
+  </Modal>
+</div>

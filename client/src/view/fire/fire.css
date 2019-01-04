@@ -1,0 +1,11 @@
+.main-botom .ivu-table-header table {
+  width: 100% !important
+}
+
+.tabStyle .ivu-tabs-no-animation>.ivu-tabs-content {
+  height: calc(100% - 56px);
+}
+
+.transf .ivu-transfer .ivu-transfer-list .ivu-transfer-list-header {
+  color: #333;
+}
